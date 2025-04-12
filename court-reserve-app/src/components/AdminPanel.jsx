@@ -27,7 +27,27 @@ export default function AdminPanel() {
   const loadCourts = async () => {
     try {
       const response = await fetchCourts();
-      setCourts(response.data.courts || []);
+      if (response && response.courts) {
+        // Process courts to check for expired games
+        const processedCourts = response.courts.map(court => {
+          if (court.currentReservation) {
+            const startTime = new Date(court.currentReservation.startTime);
+            const currentTime = new Date();
+            const timeDifferenceMinutes = (currentTime - startTime) / (1000 * 60);
+            
+            // If 60 minutes have passed, mark the court as available
+            if (timeDifferenceMinutes >= 60) {
+              return {
+                ...court,
+                isAvailable: true,
+                currentReservation: null
+              };
+            }
+          }
+          return court;
+        });
+        setCourts(processedCourts);
+      }
     } catch (error) {
       setError('Failed to load courts');
     }
@@ -210,42 +230,49 @@ export default function AdminPanel() {
           Courts Status
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {courts.map((court) => (
-            <div
-              key={court._id}
-              className="border rounded-lg p-4 bg-white shadow-sm"
-            >
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="text-lg font-medium">{court.name}</h3>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  court.isAvailable 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {court.isAvailable ? 'Available' : 'In Use'}
-                </span>
-              </div>
+          {Array.from({ length: 20 }, (_, index) => {
+            const courtNumber = index + 1;
+            const court = courts.find(c => c.name === `Court ${courtNumber}`);
+            
+            if (!court) return null;
 
-              {!court.isAvailable && court.currentReservation && (
-                <div className="text-sm text-gray-500 mb-3">
-                  <p>Started: {new Date(court.currentReservation.startTime).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}</p>
-                  <p>Players: {court.currentReservation.userIds.join(', ')}</p>
+            return (
+              <div
+                key={court._id}
+                className="border rounded-lg p-4 bg-white shadow-sm"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="text-lg font-medium">{court.name}</h3>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    court.isAvailable 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {court.isAvailable ? 'Available' : 'In Use'}
+                  </span>
                 </div>
-              )}
 
-              {!court.isAvailable && (
-                <button
-                  onClick={() => handleResetCourt(court._id)}
-                  className="w-full mt-2 bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
-                >
-                  Reset Court
-                </button>
-              )}
-            </div>
-          ))}
+                {!court.isAvailable && court.currentReservation && (
+                  <div className="text-sm text-gray-500 mb-3">
+                    <p>Started: {new Date(court.currentReservation.startTime).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}</p>
+                    <p>Players: {court.currentReservation.userIds.join(', ')}</p>
+                  </div>
+                )}
+
+                {!court.isAvailable && (
+                  <button
+                    onClick={() => handleResetCourt(court._id)}
+                    className="w-full mt-2 bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
+                  >
+                    Reset Court
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

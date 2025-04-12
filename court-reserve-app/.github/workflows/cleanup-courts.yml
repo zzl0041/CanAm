@@ -1,0 +1,16 @@
+name: Cleanup Expired Court Reservations
+
+on:
+  schedule:
+    - cron: '* * * * *'  # Run every minute
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup expired reservations
+        run: |
+          curl -X GET "${NEXT_PUBLIC_API_URL}/api/cron/cleanup"
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }} 

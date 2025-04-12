@@ -29,22 +29,14 @@ export const registerUser = async (phoneNumber) => {
   }
 };
 
-export const fetchCourts = () => api.get('/courts');
+export const fetchCourts = async () => {
+  const response = await api.get('/courts');
+  return response.data;
+};
 
 export const reserveCourt = async ({ courtId, userIds, type, option }) => {
-  try {
-    const response = await api.post('/reserve', {
-      courtId,
-      userIds,
-      type,
-      option
-    });
-    
-    return response.data;
-  } catch (error) {
-    console.error('API Error:', error.response?.data);
-    throw error;
-  }
+  const response = await api.post('/reserve', { courtId, userIds, type, option });
+  return response.data;  // Return the data directly instead of the axios response
 };
 
 export const cancelReservation = (reservationId) => api.delete(`/reservations/${reservationId}`);

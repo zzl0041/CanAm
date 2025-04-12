@@ -26,16 +26,25 @@ export async function GET() {
     const activeUsers = [];
     const activeUserSet = new Set();
 
+    // Get current time for 60-minute check
+    const currentTime = new Date();
+
     activeCourts.forEach(court => {
       if (court.currentReservation && court.currentReservation.userIds) {
-        court.currentReservation.userIds.forEach(userId => {
-          activeUsers.push({
-            username: userId,
-            courtNumber: parseInt(court.name.replace('Court ', '')),
-            startTime: court.currentReservation.startTime
+        // Check if the game is still within 60 minutes
+        const startTime = new Date(court.currentReservation.startTime);
+        const timeDifferenceMinutes = (currentTime - startTime) / (1000 * 60);
+        
+        if (timeDifferenceMinutes < 60) {
+          court.currentReservation.userIds.forEach(userId => {
+            activeUsers.push({
+              username: userId,
+              courtNumber: parseInt(court.name.replace('Court ', '')),
+              startTime: court.currentReservation.startTime
+            });
+            activeUserSet.add(userId);
           });
-          activeUserSet.add(userId);
-        });
+        }
       }
     });
 

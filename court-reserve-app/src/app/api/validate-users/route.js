@@ -51,10 +51,15 @@ export async function POST(request) {
     const activeCourts = await Court.find({ isAvailable: false })
       .populate('currentReservation');
 
-    // Create a set of users currently in active games
+    // Create a set of users currently in active games (less than 60 minutes old)
     const activeUsers = new Set(
       activeCourts
-        .filter(court => court.currentReservation)
+        .filter(court => {
+          if (!court.currentReservation) return false;
+          const startTime = new Date(court.currentReservation.startTime);
+          const timeDifferenceMinutes = (currentTime - startTime) / (1000 * 60);
+          return timeDifferenceMinutes < 60;
+        })
         .flatMap(court => court.currentReservation.userIds)
     );
 

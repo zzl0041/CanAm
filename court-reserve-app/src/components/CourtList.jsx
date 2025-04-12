@@ -19,7 +19,16 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
         const response = await fetch('/api/active-users');
         const data = await response.json();
         if (data.success) {
-          setActiveUsers(new Set(data.activeUsers));
+          // Filter out users whose games have ended (over 60 minutes)
+          const currentTime = new Date();
+          const activeUsersWithTime = data.activeUsers.filter(user => {
+            const userStartTime = new Date(user.startTime);
+            const timeDifferenceMinutes = (currentTime - userStartTime) / (1000 * 60);
+            return timeDifferenceMinutes < 60;
+          });
+          
+          // Only store the usernames of currently active users
+          setActiveUsers(new Set(activeUsersWithTime.map(user => user.username)));
         }
       } catch (error) {
         console.error('Error fetching active users:', error);
@@ -93,7 +102,8 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
       onReserve({
         courtId: selectedCourt._id,
         usernames: validUsernames,
-        type: courtType
+        type: courtType,
+        option: courtType === 'half' ? 'queue' : null  // Always use 'queue' for half court
       });
     } catch (error) {
       setError({
@@ -147,7 +157,7 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
           </div>
         </div>
 
-        {/* Username Inputs */}
+        {/* Player Inputs */}
         <div className="space-y-3 mb-6">
           {usernames.map((username, index) => (
             <div key={index}>
@@ -383,24 +393,41 @@ export default function CourtList() {
   const [showReservationModal, setShowReservationModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [selectedMergeCourt, setSelectedMergeCourt] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
+
+  // Add ref to track if any modal is open
+  const isModalOpen = showReservationModal || showMergeModal;
 
   useEffect(() => {
     loadCourts();
-    const interval = setInterval(loadCourts, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    
+    // Only set up auto-refresh if no modal is open
+    let interval;
+    if (!isModalOpen) {
+      interval = setInterval(loadCourts, 60000);
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isModalOpen, lastUpdate]); // Add lastUpdate as dependency
 
-  const loadCourts = async () => {
+  const loadCourts = async (forceLoad = false) => {
+    // Only skip refresh if a modal is open and this is not a forced load
+    if (isModalOpen && !forceLoad) {
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await fetchCourts();
-      console.log('Courts API Response:', response); // Debug log
       
-      if (response.data && response.data.courts) {
-        console.log('Number of courts:', response.data.courts.length); // Debug log
-        setCourts(response.data.courts);
+      if (response && response.courts) {
+        setCourts(response.courts);
       } else {
-        console.error('Invalid response format:', response); // Debug log
+        console.error('Invalid response format:', response);
         setError('Invalid response format from server');
       }
     } catch (error) {
@@ -418,30 +445,28 @@ export default function CourtList() {
 
   const handleReservation = async (reservationData) => {
     try {
-      const { courtId, usernames, type } = reservationData;
+      const { courtId, usernames, type, option } = reservationData;
       
-      // Debug log
-      console.log('Preparing reservation request:', {
-        courtId,
-        userIds: usernames,
-        type: type.toLowerCase() // ensure lowercase
-      });
-
+      // Make the API call
       const response = await reserveCourt({
         courtId,
         userIds: usernames,
-        type: type.toLowerCase() // ensure lowercase
+        type: type.toLowerCase(),
+        option
       });
 
       if (response.success) {
+        // Close the modal first
         setShowReservationModal(false);
-    loadCourts();
+        
+        // Force a refresh of the courts data
+        await loadCourts(true);
       } else {
         throw new Error(response.error || 'Failed to reserve court');
       }
     } catch (error) {
       console.error('Reservation error:', error);
-      alert('Failed to reserve court: ' + (error.response?.data?.error || error.message || 'Unknown error'));
+      alert('Failed to reserve court: ' + (error.error || error.message || 'Unknown error'));
     }
   };
 
@@ -466,8 +491,17 @@ export default function CourtList() {
       const data = await response.json();
       
       if (data.success) {
+        // Get the updated court data from the response
+        const updatedCourt = data.court;
+        
+        // Update the courts state with the new data
+        setCourts(prevCourts => 
+          prevCourts.map(court => 
+            court._id === courtId ? updatedCourt : court
+          )
+        );
+        
         setShowMergeModal(false);
-        loadCourts(); // Refresh the courts list
       } else {
         throw new Error(data.error || 'Failed to merge into court');
       }
@@ -500,13 +534,15 @@ export default function CourtList() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 20 }, (_, index) => {
               const courtNumber = index + 1;
-              const court = courts.find(c => c.name === `Court ${courtNumber}`) || {
-                _id: `court-${courtNumber}`,
-                name: `Court ${courtNumber}`,
-                isAvailable: true
-  };
+              const courtName = `Court ${courtNumber}`;
+              const court = courts.find(c => c.name === courtName);
 
-  return (
+              // Only create a default court if no court data exists
+              if (!court) {
+                return null; // Skip rendering if no court data
+              }
+
+              return (
                 <div 
                   key={court._id} 
                   className="border p-4 rounded-lg shadow-sm bg-white"
@@ -532,7 +568,7 @@ export default function CourtList() {
                     </div>
                   )}
 
-          <button
+                  <button
                     onClick={() => handleReserveClick(court)}
                     disabled={!court.isAvailable}
                     className={`mt-3 w-full py-2 px-4 rounded ${
@@ -542,15 +578,15 @@ export default function CourtList() {
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {court.isAvailable ? 'Reserve Court' : 'In Use'}
-          </button>
+                  </button>
 
                   {!court.isAvailable && court.currentReservation?.type === 'half' && (
-          <button
+                    <button
                       onClick={() => handleMergeClick(court)}
                       className="mt-2 w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-white rounded"
-          >
+                    >
                       Merge Into Full Court
-          </button>
+                    </button>
                   )}
                 </div>
               );
@@ -562,7 +598,7 @@ export default function CourtList() {
         <div className="lg:w-1/3">
           <QueueStatus />
         </div>
-        </div>
+      </div>
 
       {showReservationModal && (
         <ReservationModal

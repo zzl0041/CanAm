@@ -90,9 +90,23 @@ export async function POST(request) {
       type: 'full'
     });
 
+    // Get the updated court with populated reservation
+    const updatedCourt = await Court.findById(courtId)
+      .populate('currentReservation');
+
     return NextResponse.json({ 
       success: true,
-      message: 'Successfully merged into full court'
+      court: {
+        _id: updatedCourt._id,
+        name: updatedCourt.name,
+        isAvailable: updatedCourt.isAvailable,
+        currentReservation: updatedCourt.currentReservation ? {
+          startTime: updatedCourt.currentReservation.startTime,
+          userIds: updatedCourt.currentReservation.userIds,
+          type: updatedCourt.currentReservation.type,
+          option: updatedCourt.currentReservation.option
+        } : null
+      }
     });
 
   } catch (error) {
