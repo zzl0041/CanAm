@@ -13,11 +13,10 @@ const nextConfig = {
     appDir: true,
   },
 
-  // Optional: Add headers for security and CORS
+  // Optional: Add headers for security
   async headers() {
     return [
       {
-        // Allow CORS for all API routes
         source: '/api/:path*',
         headers: [
           { key: 'Access-Control-Allow-Credentials', value: 'true' },
@@ -38,16 +37,6 @@ const nextConfig = {
   // Disable image optimization during development
   images: {
     unoptimized: process.env.NODE_ENV === 'development',
-  },
-
-  // Rewrites to handle API routes properly
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: '/api/:path*',
-      },
-    ];
   },
 
   // Webpack configuration for proper module resolution
