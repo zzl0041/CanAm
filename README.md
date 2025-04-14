@@ -4,48 +4,95 @@ A modern web application for managing badminton court reservations at CanAm. Bui
 
 ## Features
 
-- **Public Court Status View**: Anyone can view the current status of courts and queue without registration
-- **User Registration**: 
-  - Simple phone number registration
-  - Unique animal name automatically assigned to each user
-  - Registration valid for the current day (PST timezone)
-  - Phone number format validation
+### Court Management
+- Real-time court status monitoring for 20 courts
+- Support for both full and half court reservations
+- Automatic court cleanup after 60 minutes
+- Court merging capability for half-court to full-court conversion
+- Real-time updates with 60-second refresh intervals
 
-- **Court Management**:
-  - Real-time court availability status
-  - Support for both full and half court reservations
-  - Queue system for court reservations
-  - Automatic court status updates
+### User System
+- Phone number-based registration
+- Unique animal name assignment for each user
+- Daily registration system (PST timezone)
+- Automatic user expiration at end of day
+- Active user tracking and status monitoring
 
-- **Queue System**:
-  - Displays current queue sorted by waiting time and court number
-  - Shows position number, court number, game type, and waiting time
-  - Auto-refreshes every 30 seconds
+### Reservation System
+- Real-time court availability checking
+- Conflict prevention for double bookings
+- Support for single and double games
+- Automatic reservation expiration after 60 minutes
+- Transaction-based reservation system to prevent race conditions
 
-## Technology Stack
+### Queue Management
+- Dynamic queue system for court assignments
+- Support for both half and full court queuing
+- Real-time queue position updates
+- Automatic queue cleanup for expired entries
 
-- **Frontend**:
-  - Next.js 13+
-  - React
-  - Tailwind CSS for styling
+### Admin Features
+- Protected admin panel with password authentication
+- Court status management
+- Manual court reset capability
+- User activity monitoring
+- System-wide status overview
 
-- **Backend**:
-  - Next.js API Routes
-  - MongoDB for database
-  - Mongoose for data modeling
+## Technical Stack
 
-- **Authentication**:
-  - Phone number based registration
-  - Daily registration system
+### Frontend
+- Next.js 13+ with App Router
+- React for UI components
+- Tailwind CSS for styling
+- Real-time updates using polling
 
-## Getting Started
+### Backend
+- Next.js API Routes
+- MongoDB with Mongoose ODM
+- Transaction support for data integrity
+- PST timezone handling
 
-1. **Prerequisites**:
-   - Node.js 14+ installed
+### Database Models
+
+#### User Model
+```javascript
+{
+  phoneNumber: String (required),
+  animalName: String (required, unique for the day),
+  createdAt: Date,
+  expiresAt: Date (end of day PST)
+}
+```
+
+#### Court Model
+```javascript
+{
+  name: String (required),
+  isAvailable: Boolean,
+  currentReservation: Reference to Reservation
+}
+```
+
+#### Reservation Model
+```javascript
+{
+  courtId: Reference to Court,
+  userIds: Array of usernames,
+  type: String (half/full),
+  option: String (merge/queue/null),
+  startTime: Date,
+  endTime: Date (60 minutes after start)
+}
+```
+
+## Setup and Installation
+
+1. **Prerequisites**
+   - Node.js 14+
    - MongoDB instance
    - Git
 
-2. **Installation**:
+2. **Environment Setup**
    ```bash
    # Clone the repository
    git clone [repository-url]
@@ -53,65 +100,45 @@ A modern web application for managing badminton court reservations at CanAm. Bui
 
    # Install dependencies
    npm install
-
-   # Set up environment variables
-   cp .env.example .env.local
    ```
 
-3. **Environment Variables**:
+3. **Configuration**
    Create a `.env.local` file with:
    ```
-   MONGODB_URI=your_mongodb_connection_string
+   MONGODB_URI=mongodb+srv://[username]:[password]@[cluster].mongodb.net/canam
    ```
 
-4. **Run the Development Server**:
+4. **Development**
    ```bash
    npm run dev
    ```
-   The application will be available at `http://localhost:3000`
+   Access the application at `http://localhost:3000`
 
-## Database Schema
+## API Endpoints
 
-### User Model
-- `phoneNumber`: String (required)
-- `animalName`: String (required)
-- `createdAt`: Date
-- `expiresAt`: Date
+### Public Endpoints
+- `GET /api/courts` - Get all court statuses
+- `POST /api/reserve` - Make a court reservation
+- `GET /api/queue` - View current queue status
+- `POST /api/queue/join` - Join the queue
 
-### Court Model
-- `name`: String
-- `isAvailable`: Boolean
-- `currentReservation`: Reference to Reservation
+### Admin Endpoints
+- `GET /api/admin/users` - View all users
+- `POST /api/admin/reset-court` - Reset court status
+- `GET /api/cron/cleanup` - Cleanup expired reservations
 
-### Reservation Model
-- `courtId`: Reference to Court
-- `userIds`: Array of user IDs
-- `type`: String (half/full)
-- `startTime`: Date
-- `endTime`: Date
-
-## Features in Detail
-
-### Registration System
-- Users register with a phone number
-- System assigns a unique animal name
-- Registration valid until end of day (PST)
-- Automatic cleanup of expired registrations
-
-### Court Management
-- Real-time court status updates
-- Support for different game types
-- Queue management for busy periods
-- Automatic expiration of reservations
+## Security Features
+- Protected admin routes
+- Transaction-based operations
+- Rate limiting on API endpoints
+- Validation for all user inputs
+- Secure environment variable handling
 
 ## Contributing
-
 Please read our contributing guidelines before submitting pull requests.
 
-## License
-
-[Your chosen license]
-
 ## Support
+For technical support or feature requests, please contact the development team.
 
-For support, please contact [contact information]
+## License
+[MIT License] (or your chosen license)
