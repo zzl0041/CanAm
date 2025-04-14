@@ -8,6 +8,11 @@ const nextConfig = {
     MONGODB_URI: process.env.MONGODB_URI,
   },
 
+  // Disable static page generation for API routes
+  experimental: {
+    appDir: true,
+  },
+
   // Optional: Add headers for security
   async headers() {
     return [
@@ -21,7 +26,13 @@ const nextConfig = {
         ],
       },
     ];
-  }
+  },
+
+  // Webpack configuration for proper module resolution
+  webpack: (config) => {
+    config.resolve.fallback = { fs: false, net: false, tls: false };
+    return config;
+  },
 };
 
 export default nextConfig;

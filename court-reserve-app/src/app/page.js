@@ -9,7 +9,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('courts');
 
   return (
-    <main className="container mx-auto p-4 max-w-4xl">
+    <div className="max-w-4xl mx-auto">
       {/* Tabs */}
       <div className="flex mb-4 border-b">
         <button
@@ -65,6 +65,6 @@ export default function Home() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

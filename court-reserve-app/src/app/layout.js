@@ -1,11 +1,8 @@
-import { Inter } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
-
 export const metadata = {
-  title: 'CanAm Badminton Court Reservation',
-  description: 'Book your badminton court at CanAm',
+  title: 'CanAm Court Reservation',
+  description: 'Badminton court reservation system for CanAm',
   icons: [
     { rel: 'icon', url: '/CanAm.png' },
     { rel: 'shortcut icon', url: '/CanAm.png' },
@@ -16,15 +13,17 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="icon" href="/CanAm.png" />
-        <link rel="shortcut icon" href="/CanAm.png" />
-      </head>
-      <body className={inter.className}>
-        <header className="bg-blue-600 text-white p-4">
-          <h1 className="text-2xl font-bold text-center">CanAm Badminton Court Reservation System</h1>
+      <body>
+        <header className="bg-blue-600 text-white p-4 shadow-md">
+          <div className="container mx-auto">
+            <h1 className="text-2xl font-bold text-center">
+              CanAm Badminton Court Reservation System
+            </h1>
+          </div>
         </header>
-        {children}
+        <main className="container mx-auto px-4 py-8">
+          {children}
+        </main>
       </body>
     </html>
   )
