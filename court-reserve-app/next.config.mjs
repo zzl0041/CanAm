@@ -8,7 +8,7 @@ const nextConfig = {
     MONGODB_URI: process.env.MONGODB_URI,
   },
 
-  // Disable static page generation for API routes
+  // Enable app directory
   experimental: {
     appDir: true,
   },
@@ -26,6 +26,17 @@ const nextConfig = {
         ],
       },
     ];
+  },
+
+  // Disable powered by header
+  poweredByHeader: false,
+
+  // Enable strict mode
+  reactStrictMode: true,
+
+  // Disable image optimization during development
+  images: {
+    unoptimized: process.env.NODE_ENV === 'development',
   },
 
   // Webpack configuration for proper module resolution
