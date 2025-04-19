@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { fetchCourts, reserveCourt } from '../utils/api';
+import { 
+  fetchCourts, 
+  reserveCourt, 
+  validateUsers, 
+  fetchActiveUsers 
+} from '../utils/api';
 import QueueStatus from './QueueStatus';
-import { validateUsernames } from '../utils/validation';
 
 // Separate ReservationModal component
 const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
@@ -14,10 +18,9 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
 
   // Fetch active users when modal opens
   useEffect(() => {
-    const fetchActiveUsers = async () => {
+    const loadActiveUsers = async () => {
       try {
-        const response = await fetch('/api/active-users');
-        const data = await response.json();
+        const data = await fetchActiveUsers();
         if (data.success) {
           // Filter out users whose games have ended (over 60 minutes)
           const currentTime = new Date();
@@ -32,36 +35,22 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
         }
       } catch (error) {
         console.error('Error fetching active users:', error);
+        setError({
+          type: 'system',
+          message: 'Failed to fetch active users'
+        });
       }
     };
-    fetchActiveUsers();
+    loadActiveUsers();
   }, []);
 
   const handleUsernameChange = (index, value) => {
     setUsernames(prev => {
       const newUsernames = [...prev];
       newUsernames[index] = value;
-      // Clear error when user starts typing
       setError(null);
       return newUsernames;
     });
-  };
-
-  const validateUsernames = async (usernames) => {
-    try {
-      const response = await fetch('/api/validate-users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ usernames: usernames.filter(u => u.trim() !== '') })
-      });
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Username validation error:', error);
-      throw error;
-    }
   };
 
   const handleSubmit = async () => {
@@ -88,7 +77,7 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
       }
 
       // Validate usernames exist
-      const validation = await validateUsernames(validUsernames);
+      const validation = await validateUsers(validUsernames);
       if (!validation.valid) {
         setError({
           type: 'invalid_users',
@@ -101,9 +90,9 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
       // If all validations pass, proceed with reservation
       onReserve({
         courtId: selectedCourt._id,
-        usernames: validUsernames,
+        userIds: validUsernames,
         type: courtType,
-        option: courtType === 'half' ? 'queue' : null  // Always use 'queue' for half court
+        option: courtType === 'half' ? 'queue' : null
       });
     } catch (error) {
       setError({
@@ -290,7 +279,7 @@ const MergeModal = ({ court, onClose, onMerge }) => {
       }
 
       // Validate usernames exist
-      const validation = await validateUsernames(validUsernames);
+      const validation = await validateUsers(validUsernames);
       if (!validation.valid) {
         setError({
           type: 'invalid_users',
@@ -303,7 +292,7 @@ const MergeModal = ({ court, onClose, onMerge }) => {
       // If all validations pass, proceed with merge
       await onMerge({
         courtId: court._id,
-        usernames: validUsernames
+        userIds: validUsernames
       });
       
       onClose();
@@ -445,12 +434,12 @@ export default function CourtList() {
 
   const handleReservation = async (reservationData) => {
     try {
-      const { courtId, usernames, type, option } = reservationData;
+      const { courtId, userIds, type, option } = reservationData;
       
       // Make the API call
       const response = await reserveCourt({
         courtId,
-        userIds: usernames,
+        userIds,
         type: type.toLowerCase(),
         option
       });
@@ -475,7 +464,7 @@ export default function CourtList() {
     setShowMergeModal(true);
   };
 
-  const handleMerge = async ({ courtId, usernames }) => {
+  const handleMerge = async ({ courtId, userIds }) => {
     try {
       const response = await fetch('/api/merge', {
         method: 'POST',
@@ -484,7 +473,7 @@ export default function CourtList() {
         },
         body: JSON.stringify({
           courtId,
-          userIds: usernames,
+          userIds,
         }),
       });
 

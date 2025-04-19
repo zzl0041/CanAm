@@ -47,12 +47,14 @@ export async function POST(request) {
         console.log('Existing user found:', user);
         return NextResponse.json({ 
           success: true,
-          user: {
-            phoneNumber: user.phoneNumber,
-            animalName: user.animalName,
-            createdAt: user.createdAt
-          },
-          isExisting: true
+          data: {
+            user: {
+              phoneNumber: user.phoneNumber,
+              animalName: user.animalName,
+              createdAt: user.createdAt
+            },
+            isExisting: true
+          }
         });
       }
 
@@ -76,12 +78,14 @@ export async function POST(request) {
 
       return NextResponse.json({
         success: true,
-        user: {
-          phoneNumber: user.phoneNumber,
-          animalName: user.animalName,
-          createdAt: user.createdAt
-        },
-        isExisting: false
+        data: {
+          user: {
+            phoneNumber: user.phoneNumber,
+            animalName: user.animalName,
+            createdAt: user.createdAt
+          },
+          isExisting: false
+        }
       });
 
     } catch (error) {

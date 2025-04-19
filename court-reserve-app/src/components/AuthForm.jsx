@@ -35,8 +35,8 @@ export default function AuthForm() {
     try {
       const response = await registerUser(validation.cleaned);
       
-      if (!response.data || !response.data.success) {
-        throw new Error(response.data?.error || 'Registration failed');
+      if (!response.success) {
+        throw new Error(response.error || 'Registration failed');
       }
 
       setModalContent({
@@ -49,7 +49,7 @@ export default function AuthForm() {
     } catch (error) {
       setModalContent({
         title: 'Registration Failed',
-        message: error.response?.data?.error || error.message || 'Failed to register',
+        message: error.message || 'Failed to register',
         isError: true
       });
       setShowModal(true);

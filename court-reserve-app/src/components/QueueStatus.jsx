@@ -6,19 +6,26 @@ import { fetchQueue } from '../utils/api';
 export default function QueueStatus() {
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadQueue();
-    const interval = setInterval(loadQueue, 60000); // Changed to 60 seconds
+    const interval = setInterval(loadQueue, 60000); // Refresh every 60 seconds
     return () => clearInterval(interval);
   }, []);
 
   const loadQueue = async () => {
     try {
+      setError(null);
       const response = await fetchQueue();
-      setQueue(response.data.queue || []);
+      if (response.success) {
+        setQueue(response.queue || []);
+      } else {
+        setError(response.error || 'Failed to load queue');
+      }
     } catch (error) {
       console.error('Error loading queue:', error);
+      setError(error.message || 'Failed to load queue');
     } finally {
       setLoading(false);
     }
@@ -40,6 +47,23 @@ export default function QueueStatus() {
       <div className="bg-white rounded-lg shadow p-4">
         <h2 className="text-lg font-semibold mb-4">Current Queue</h2>
         <div className="text-center text-gray-500">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg shadow p-4">
+        <h2 className="text-lg font-semibold mb-4">Current Queue</h2>
+        <div className="text-center text-red-500">
+          <p>{error}</p>
+          <button 
+            onClick={loadQueue}
+            className="mt-2 text-sm text-blue-500 hover:text-blue-600"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
