@@ -5,17 +5,52 @@ import Court from '@/models/Court';
 
 export async function POST(request) {
   try {
-    await dbConnect();
-    const { usernames } = await request.json();
+    // Connect to database with error handling
+    try {
+      await dbConnect();
+    } catch (dbError) {
+      console.error('Database connection error:', dbError);
+      return NextResponse.json({ 
+        success: false,
+        error: 'Database connection failed'
+      }, { status: 500 });
+    }
+
+    // Parse request body with error handling
+    let usernames;
+    try {
+      const body = await request.json();
+      usernames = body.usernames;
+      
+      if (!usernames || !Array.isArray(usernames)) {
+        return NextResponse.json({
+          success: false,
+          error: 'Invalid request format: usernames must be an array'
+        }, { status: 400 });
+      }
+    } catch (parseError) {
+      console.error('Request parsing error:', parseError);
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid request format'
+      }, { status: 400 });
+    }
     
-    console.log('Validating usernames:', usernames); // Debug log
+    console.log('Validating usernames:', usernames);
 
     // Format usernames to match database format
     const formattedUsernames = usernames.map(name => 
-      name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
-    );
+      name?.charAt(0).toUpperCase() + name?.slice(1).toLowerCase() || ''
+    ).filter(name => name); // Filter out any empty names
 
-    console.log('Formatted usernames:', formattedUsernames); // Debug log
+    console.log('Formatted usernames:', formattedUsernames);
+
+    if (formattedUsernames.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'No valid usernames provided'
+      }, { status: 400 });
+    }
 
     // Update the user validation query to use createdAt instead of expiresAt
     const currentTime = new Date();
@@ -23,12 +58,21 @@ export async function POST(request) {
     const startOfDay = new Date(pstDate);
     startOfDay.setHours(0, 0, 0, 0);
 
-    const existingUsers = await User.find({
-      animalName: { $in: formattedUsernames },
-      createdAt: { $gte: startOfDay }
-    });
-
-    console.log('Found users:', existingUsers); // Debug log
+    // Find existing users with error handling
+    let existingUsers;
+    try {
+      existingUsers = await User.find({
+        animalName: { $in: formattedUsernames },
+        createdAt: { $gte: startOfDay }
+      });
+      console.log('Found users:', existingUsers);
+    } catch (userQueryError) {
+      console.error('User query error:', userQueryError);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to query user database'
+      }, { status: 500 });
+    }
 
     // Create a set of valid usernames
     const validUsernames = new Set(existingUsers.map(user => user.animalName));
@@ -47,9 +91,18 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    // Get active courts with their current reservations
-    const activeCourts = await Court.find({ isAvailable: false })
-      .populate('currentReservation');
+    // Get active courts with error handling
+    let activeCourts;
+    try {
+      activeCourts = await Court.find({ isAvailable: false })
+        .populate('currentReservation');
+    } catch (courtQueryError) {
+      console.error('Court query error:', courtQueryError);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to query court database'
+      }, { status: 500 });
+    }
 
     // Create a set of users currently in active games (less than 60 minutes old)
     const activeUsers = new Set(
@@ -63,32 +116,29 @@ export async function POST(request) {
         .flatMap(court => court.currentReservation.userIds)
     );
 
-    // Create a set of valid usernames (case-insensitive comparison)
-    const validUsernamesSet = new Set(existingUsers.map(user => user.animalName));
-
-    // Find which usernames don't exist or are in active games
-    const invalidUsernamesInActiveGames = formattedUsernames.filter(username => 
-      !validUsernamesSet.has(username) || activeUsers.has(username)
-    );
-
     // For better error messages, separate invalid and active users
     const nonExistentUsers = formattedUsernames.filter(username => 
-      !validUsernamesSet.has(username)
+      !validUsernames.has(username)
     );
     const busyUsers = formattedUsernames.filter(username => 
-      validUsernamesSet.has(username) && activeUsers.has(username)
+      validUsernames.has(username) && activeUsers.has(username)
     );
 
-    return NextResponse.json({
+    const response = {
       success: true,
-      valid: invalidUsernames.length === 0,
+      valid: invalidUsernames.length === 0 && busyUsers.length === 0,
       invalidUsernames,
       nonExistentUsers,
       busyUsers,
       message: invalidUsernames.length > 0 
         ? `The following users are not registered or have expired: ${invalidUsernames.join(', ')}`
-        : 'All users are valid'
-    });
+        : busyUsers.length > 0
+          ? `The following users are currently in active games: ${busyUsers.join(', ')}`
+          : 'All users are valid'
+    };
+
+    console.log('Validation response:', response);
+    return NextResponse.json(response);
   } catch (error) {
     console.error('User validation error:', error);
     return NextResponse.json({ 
