@@ -390,40 +390,35 @@ export default function CourtList() {
   useEffect(() => {
     loadCourts();
     
-    // Only set up auto-refresh if no modal is open
-    let interval;
-    if (!isModalOpen) {
-      interval = setInterval(loadCourts, 60000);
-    }
-    
-    return () => {
-      if (interval) {
-        clearInterval(interval);
+    // Poll every 60 seconds for court status updates
+    const interval = setInterval(() => {
+      if (!isModalOpen) {
+        loadCourts(true);
       }
-    };
-  }, [isModalOpen, lastUpdate]); // Add lastUpdate as dependency
+    }, 60000);  // Changed back to 60 seconds
+    
+    return () => clearInterval(interval);
+  }, [isModalOpen]);
 
-  const loadCourts = async (forceLoad = false) => {
-    // Only skip refresh if a modal is open and this is not a forced load
-    if (isModalOpen && !forceLoad) {
-      return;
-    }
-
+  const loadCourts = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await fetchCourts();
       
-      if (response && response.courts) {
+      if (response && response.success && Array.isArray(response.courts)) {
         setCourts(response.courts);
+        setError(null);
       } else {
-        console.error('Invalid response format:', response);
-        setError('Invalid response format from server');
+        throw new Error('Invalid response format from server');
       }
     } catch (error) {
       console.error('Error loading courts:', error);
       setError(error.message || 'Failed to load courts');
+      
+      // Retry after 5 seconds on error
+      setTimeout(() => loadCourts(true), 5000);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -436,7 +431,6 @@ export default function CourtList() {
     try {
       const { courtId, userIds, type, option } = reservationData;
       
-      // Make the API call
       const response = await reserveCourt({
         courtId,
         userIds,
@@ -445,17 +439,14 @@ export default function CourtList() {
       });
 
       if (response.success) {
-        // Close the modal first
         setShowReservationModal(false);
-        
-        // Force a refresh of the courts data
-        await loadCourts(true);
+        await loadCourts(true);  // Silent reload
       } else {
         throw new Error(response.error || 'Failed to reserve court');
       }
     } catch (error) {
       console.error('Reservation error:', error);
-      alert('Failed to reserve court: ' + (error.error || error.message || 'Unknown error'));
+      alert(error.message || 'Failed to reserve court');
     }
   };
 
@@ -471,32 +462,20 @@ export default function CourtList() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          courtId,
-          userIds,
-        }),
+        body: JSON.stringify({ courtId, userIds }),
       });
 
       const data = await response.json();
       
       if (data.success) {
-        // Get the updated court data from the response
-        const updatedCourt = data.court;
-        
-        // Update the courts state with the new data
-        setCourts(prevCourts => 
-          prevCourts.map(court => 
-            court._id === courtId ? updatedCourt : court
-          )
-        );
-        
         setShowMergeModal(false);
+        await loadCourts(true);  // Silent reload
       } else {
         throw new Error(data.error || 'Failed to merge into court');
       }
     } catch (error) {
       console.error('Merge error:', error);
-      alert('Failed to merge: ' + (error.message || 'Unknown error'));
+      alert(error.message || 'Failed to merge courts');
     }
   };
 

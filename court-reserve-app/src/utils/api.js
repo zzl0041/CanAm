@@ -15,7 +15,13 @@ const api = axios.create({
 
 // Add response interceptor for error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Validate response format
+    if (!response.data) {
+      throw new Error('Invalid response format: missing data');
+    }
+    return response;
+  },
   (error) => {
     // Enhanced error logging for production
     if (error.response) {
@@ -26,34 +32,52 @@ api.interceptors.response.use(
         data: error.response.data,
         headers: error.response.headers
       });
+      
+      // Transform error message for user-friendly display
+      const errorMessage = error.response.data?.error || 
+        error.response.data?.message || 
+        `Server error: ${error.response.status}`;
+      
+      throw new Error(errorMessage);
     } else if (error.request) {
       // Request made but no response
       console.error('API No Response:', {
         endpoint: error.config?.url,
         request: error.request
       });
+      throw new Error('No response from server. Please check your connection.');
     } else {
       // Request setup error
       console.error('API Request Error:', {
         endpoint: error.config?.url,
         message: error.message
       });
+      throw error;
     }
-    throw error;
   }
 );
+
+// Helper function to validate response
+const validateResponse = (response, requiredFields = []) => {
+  if (!response.data) {
+    throw new Error('Invalid response: missing data');
+  }
+  
+  for (const field of requiredFields) {
+    if (!(field in response.data)) {
+      throw new Error(`Invalid response: missing ${field}`);
+    }
+  }
+  
+  return response.data;
+};
 
 export const registerUser = async (phoneNumber) => {
   try {
     const response = await api.post('/register', { 
       phoneNumber: phoneNumber.toString().trim() 
     });
-    
-    if (!response.data) {
-      throw new Error('Invalid response from server');
-    }
-    
-    return response.data;  // Return the entire response data which includes success and data fields
+    return validateResponse(response, ['success']);
   } catch (error) {
     console.error('Registration error:', error);
     throw error;
@@ -63,7 +87,7 @@ export const registerUser = async (phoneNumber) => {
 export const fetchCourts = async () => {
   try {
     const response = await api.get('/courts');
-    return response.data;
+    return validateResponse(response, ['success', 'courts']);
   } catch (error) {
     console.error('Error fetching courts:', error);
     throw error;
@@ -73,7 +97,7 @@ export const fetchCourts = async () => {
 export const reserveCourt = async ({ courtId, userIds, type, option }) => {
   try {
     const response = await api.post('/reserve', { courtId, userIds, type, option });
-    return response.data;
+    return validateResponse(response, ['success']);
   } catch (error) {
     console.error('Error reserving court:', error);
     throw error;
@@ -83,7 +107,7 @@ export const reserveCourt = async ({ courtId, userIds, type, option }) => {
 export const validateUsers = async (usernames) => {
   try {
     const response = await api.post('/validate-users', { usernames });
-    return response.data;
+    return validateResponse(response, ['success']);
   } catch (error) {
     console.error('Error validating users:', error);
     throw error;
@@ -93,7 +117,7 @@ export const validateUsers = async (usernames) => {
 export const fetchActiveUsers = async () => {
   try {
     const response = await api.get('/active-users');
-    return response.data;
+    return validateResponse(response, ['success', 'activeUsers']);
   } catch (error) {
     console.error('Error fetching active users:', error);
     throw error;
@@ -113,10 +137,7 @@ export const cancelReservation = async (reservationId) => {
 export const fetchQueue = async () => {
   try {
     const response = await api.get('/queue');
-    if (!response.data || !response.data.success) {
-      throw new Error(response.data?.error || 'Failed to fetch queue data');
-    }
-    return response.data;
+    return validateResponse(response, ['success', 'queue']);
   } catch (error) {
     console.error('Error fetching queue:', error);
     throw error;
@@ -126,7 +147,7 @@ export const fetchQueue = async () => {
 export const joinQueue = async (userIds, type) => {
   try {
     const response = await api.post('/queue/join', { userIds, type });
-    return response.data;
+    return validateResponse(response, ['success']);
   } catch (error) {
     console.error('Error joining queue:', error);
     throw error;

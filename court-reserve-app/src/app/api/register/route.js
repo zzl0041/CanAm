@@ -37,6 +37,11 @@ export async function POST(request) {
     startOfDay.setHours(0, 0, 0, 0);
     
     try {
+      // First, clean up any expired users (from previous days)
+      await User.deleteMany({
+        createdAt: { $lt: startOfDay }
+      });
+
       // Check if user already exists and registered today
       let user = await User.findOne({ 
         phoneNumber: cleanedPhone,
@@ -58,12 +63,6 @@ export async function POST(request) {
         });
       }
 
-      // Delete any old registrations for this phone number
-      await User.deleteMany({ 
-        phoneNumber: cleanedPhone,
-        createdAt: { $lt: startOfDay }
-      });
-
       // Get a unique animal name
       const animalName = await getUniqueAnimalName(User);
 
@@ -71,7 +70,8 @@ export async function POST(request) {
       user = await User.create({
         phoneNumber: cleanedPhone,
         animalName,
-        createdAt: now
+        createdAt: now,
+        expiresAt: new Date(pstDate.setHours(23, 59, 59, 999))
       });
 
       console.log('Created new user:', user);
