@@ -3,12 +3,16 @@ import dbConnect from '@/lib/mongodb';
 import Court from '@/models/Court';
 import Reservation from '@/models/Reservation';
 
-export async function GET() {
+export async function GET(request) {
   try {
     await dbConnect();
     
+    // Check if this is an admin request
+    const isAdmin = request.headers.get('x-admin-password') === 'canamadmin';
+    
     // Get all courts with active reservations
-    const activeCourts = await Court.find({ isAvailable: false })
+    const query = isAdmin ? { isAvailable: false } : { isAvailable: false, isVisible: true };
+    const activeCourts = await Court.find(query)
       .populate('currentReservation');
 
     const currentTime = new Date();
@@ -21,7 +25,7 @@ export async function GET() {
         const startTime = new Date(court.currentReservation.startTime);
         const timeDifferenceMinutes = (currentTime - startTime) / (1000 * 60);
         
-        if (timeDifferenceMinutes >= 60) {
+        if (timeDifferenceMinutes >= 30) {
           // Update the court in database
           await Court.findByIdAndUpdate(court._id, {
             isAvailable: true,

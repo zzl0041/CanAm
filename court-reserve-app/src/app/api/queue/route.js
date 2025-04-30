@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import Court from '@/models/Court';
 
-export async function GET() {
+export async function GET(request) {
   try {
     await dbConnect();
     
+    // Check if this is an admin request
+    const isAdmin = request.headers.get('x-admin-password') === 'canamadmin';
+    
     // Get all courts with active reservations
-    const courts = await Court.find({ isAvailable: false })
+    const query = isAdmin ? { isAvailable: false } : { isAvailable: false, isVisible: true };
+    const courts = await Court.find(query)
       .populate('currentReservation')
       .sort({ name: 1 });  // Sort by court name
 

@@ -35,8 +35,8 @@ export default function AdminPanel() {
             const currentTime = new Date();
             const timeDifferenceMinutes = (currentTime - startTime) / (1000 * 60);
             
-            // If 60 minutes have passed, mark the court as available
-            if (timeDifferenceMinutes >= 60) {
+            // If 30 minutes have passed, mark the court as available
+            if (timeDifferenceMinutes >= 30) {
               return {
                 ...court,
                 isAvailable: true,
@@ -103,6 +103,38 @@ export default function AdminPanel() {
       }
     } catch (error) {
       setError('Failed to reset court');
+    }
+
+    // Clear messages after 3 seconds
+    setTimeout(() => {
+      setSuccessMessage(null);
+      setError(null);
+    }, 3000);
+  };
+
+  const handleToggleVisibility = async (courtId) => {
+    try {
+      const response = await fetch('/api/admin/toggle-court-visibility', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          courtId,
+          adminPassword: 'canamadmin'
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setSuccessMessage(`Court visibility updated successfully`);
+        loadCourts();
+      } else {
+        setError(data.error || 'Failed to update court visibility');
+      }
+    } catch (error) {
+      setError('Failed to update court visibility');
     }
 
     // Clear messages after 3 seconds
@@ -243,13 +275,25 @@ export default function AdminPanel() {
               >
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="text-lg font-medium">{court.name}</h3>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    court.isAvailable 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {court.isAvailable ? 'Available' : 'In Use'}
-                  </span>
+                  <div className="flex gap-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      court.isAvailable 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {court.isAvailable ? 'Available' : 'In Use'}
+                    </span>
+                    <button
+                      onClick={() => handleToggleVisibility(court._id)}
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        court.isVisible
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {court.isVisible ? 'Visible' : 'Hidden'}
+                    </button>
+                  </div>
                 </div>
 
                 {!court.isAvailable && court.currentReservation && (

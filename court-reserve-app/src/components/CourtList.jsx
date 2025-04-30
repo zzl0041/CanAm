@@ -19,12 +19,12 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
         const response = await fetch('/api/active-users');
         const data = await response.json();
         if (data.success) {
-          // Filter out users whose games have ended (over 60 minutes)
+          // Filter out users whose games have ended (over 30 minutes)
           const currentTime = new Date();
           const activeUsersWithTime = data.activeUsers.filter(user => {
             const userStartTime = new Date(user.startTime);
             const timeDifferenceMinutes = (currentTime - userStartTime) / (1000 * 60);
-            return timeDifferenceMinutes < 60;
+            return timeDifferenceMinutes < 30;
           });
           
           // Only store the usernames of currently active users
@@ -537,9 +537,9 @@ export default function CourtList() {
               const courtName = `Court ${courtNumber}`;
               const court = courts.find(c => c.name === courtName);
 
-              // Only create a default court if no court data exists
-              if (!court) {
-                return null; // Skip rendering if no court data
+              // Skip rendering if no court data exists or if court is not visible
+              if (!court || !court.isVisible) {
+                return null;
               }
 
               return (

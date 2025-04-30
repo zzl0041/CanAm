@@ -3,9 +3,12 @@ import dbConnect from '@/lib/mongodb';
 import Court from '@/models/Court';
 import Reservation from '@/models/Reservation';
 
-export async function GET() {
+export async function GET(request) {
   try {
     await dbConnect();
+    
+    // Check if this is an admin request
+    const isAdmin = request.headers.get('x-admin-password') === 'canamadmin';
     
     // First, ensure all courts exist (1 through 20)
     const existingCourts = await Court.find().sort({ name: 1 });
@@ -18,7 +21,8 @@ export async function GET() {
       if (!existingCourtNames.has(courtName)) {
         courtsToCreate.push({
           name: courtName,
-          isAvailable: true
+          isAvailable: true,
+          isVisible: true
         });
       }
     }
@@ -27,8 +31,9 @@ export async function GET() {
       await Court.create(courtsToCreate);
     }
     
-    // Fetch all courts with populated reservation data
-    const courts = await Court.find()
+    // Fetch courts based on visibility
+    const query = isAdmin ? {} : { isVisible: true };
+    const courts = await Court.find(query)
       .populate('currentReservation')
       .sort({ name: 1 });
 
@@ -41,8 +46,8 @@ export async function GET() {
         const startTime = new Date(court.currentReservation.startTime);
         const timeDifferenceMinutes = (currentTime - startTime) / (1000 * 60);
         
-        // If 60 minutes have passed, update the database
-        if (timeDifferenceMinutes >= 60) {
+        // If 30 minutes have passed, update the database
+        if (timeDifferenceMinutes >= 30) {
           // Update the court in database
           await Court.findByIdAndUpdate(court._id, {
             isAvailable: true,
@@ -58,6 +63,7 @@ export async function GET() {
             _id: court._id,
             name: court.name,
             isAvailable: true,
+            isVisible: court.isVisible,
             currentReservation: null
           };
         }
@@ -68,6 +74,7 @@ export async function GET() {
         _id: court._id,
         name: court.name,
         isAvailable: court.isAvailable,
+        isVisible: court.isVisible,
         currentReservation: court.currentReservation ? {
           startTime: court.currentReservation.startTime,
           userIds: court.currentReservation.userIds || [],
