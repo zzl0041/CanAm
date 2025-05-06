@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { fetchCourts } from '../utils/api';
+import { fetchCourts, resetCourt } from '../utils/api';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://canam-server.onrender.com';
 
 export default function AdminPanel() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -10,6 +12,7 @@ export default function AdminPanel() {
   const [users, setUsers] = useState({ active: [], idle: [] });
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -27,7 +30,7 @@ export default function AdminPanel() {
   const loadCourts = async () => {
     try {
       const response = await fetchCourts();
-      if (response && response.courts) {
+      if (response && response.success && response.courts) {
         // Process courts to check for expired games
         const processedCourts = response.courts.map(court => {
           if (court.currentReservation) {
@@ -55,16 +58,26 @@ export default function AdminPanel() {
 
   const loadUsers = async () => {
     try {
-      const response = await fetch('/api/admin/users');
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+        headers: {
+          'x-admin-password': 'canamadmin'
+        }
+      });
       const data = await response.json();
+      
       if (data.success) {
         setUsers({
           active: data.activeUsers || [],
           idle: data.idleUsers || []
         });
+      } else {
+        setError('Failed to load users');
       }
     } catch (error) {
       console.error('Failed to load users:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -81,28 +94,17 @@ export default function AdminPanel() {
 
   const handleResetCourt = async (courtId) => {
     try {
-      const response = await fetch('/api/admin/reset-court', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          courtId,
-          adminPassword: 'canamadmin'
-        })
-      });
-
-      const data = await response.json();
+      const response = await resetCourt(courtId);
       
-      if (data.success) {
-        setSuccessMessage(`Court reset successfully`);
+      if (response.success) {
+        setSuccessMessage('Court reset successfully');
         loadCourts();
-        loadUsers(); // Reload users after court reset
+        loadUsers();
       } else {
-        setError(data.error || 'Failed to reset court');
+        setError(response.error || 'Failed to reset court');
       }
     } catch (error) {
-      setError('Failed to reset court');
+      setError('Error resetting court: ' + error.message);
     }
 
     // Clear messages after 3 seconds
@@ -114,27 +116,25 @@ export default function AdminPanel() {
 
   const handleToggleVisibility = async (courtId) => {
     try {
-      const response = await fetch('/api/admin/toggle-court-visibility', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/toggle-court-visibility`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-admin-password': 'canamadmin'
         },
-        body: JSON.stringify({ 
-          courtId,
-          adminPassword: 'canamadmin'
-        })
+        body: JSON.stringify({ courtId }),
       });
 
       const data = await response.json();
       
       if (data.success) {
-        setSuccessMessage(`Court visibility updated successfully`);
+        setSuccessMessage('Court visibility updated successfully');
         loadCourts();
       } else {
         setError(data.error || 'Failed to update court visibility');
       }
     } catch (error) {
-      setError('Failed to update court visibility');
+      setError('Error toggling court visibility: ' + error.message);
     }
 
     // Clear messages after 3 seconds
@@ -180,6 +180,10 @@ export default function AdminPanel() {
         </form>
       </div>
     );
+  }
+
+  if (loading) {
+    return <div>Loading...</div>;
   }
 
   return (
@@ -262,61 +266,54 @@ export default function AdminPanel() {
           Courts Status
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 20 }, (_, index) => {
-            const courtNumber = index + 1;
-            const court = courts.find(c => c.name === `Court ${courtNumber}`);
-            
-            if (!court) return null;
-
-            return (
-              <div
-                key={court._id}
-                className="border rounded-lg p-4 bg-white shadow-sm"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-medium">{court.name}</h3>
-                  <div className="flex gap-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      court.isAvailable 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {court.isAvailable ? 'Available' : 'In Use'}
-                    </span>
-                    <button
-                      onClick={() => handleToggleVisibility(court._id)}
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        court.isVisible
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {court.isVisible ? 'Visible' : 'Hidden'}
-                    </button>
-                  </div>
-                </div>
-
-                {!court.isAvailable && court.currentReservation && (
-                  <div className="text-sm text-gray-500 mb-3">
-                    <p>Started: {new Date(court.currentReservation.startTime).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}</p>
-                    <p>Players: {court.currentReservation.userIds.join(', ')}</p>
-                  </div>
-                )}
-
-                {!court.isAvailable && (
+          {courts.map((court) => (
+            <div
+              key={court._id}
+              className="border rounded-lg p-4 bg-white shadow-sm"
+            >
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="text-lg font-medium">{court.name}</h3>
+                <div className="flex gap-2">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    court.isAvailable 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {court.isAvailable ? 'Available' : 'In Use'}
+                  </span>
                   <button
-                    onClick={() => handleResetCourt(court._id)}
-                    className="w-full mt-2 bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
+                    onClick={() => handleToggleVisibility(court._id)}
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      court.isVisible
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}
                   >
-                    Reset Court
+                    {court.isVisible ? 'Visible' : 'Hidden'}
                   </button>
-                )}
+                </div>
               </div>
-            );
-          })}
+
+              {!court.isAvailable && court.currentReservation && (
+                <div className="text-sm text-gray-500 mb-3">
+                  <p>Started: {new Date(court.currentReservation.startTime).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}</p>
+                  <p>Players: {court.currentReservation.userIds.join(', ')}</p>
+                </div>
+              )}
+
+              {!court.isAvailable && (
+                <button
+                  onClick={() => handleResetCourt(court._id)}
+                  className="w-full mt-2 bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
+                >
+                  Reset Court
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
