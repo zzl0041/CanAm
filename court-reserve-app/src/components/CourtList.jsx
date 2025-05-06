@@ -549,56 +549,62 @@ export default function CourtList() {
                 No courts available
               </div>
             ) : (
-              courts.map((court) => (
-                <div 
-                  key={court._id} 
-                  className="border p-3 rounded-lg shadow-sm bg-white flex flex-col"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-base sm:text-lg font-medium">{court.name}</h3>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      court.isAvailable 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {court.isAvailable ? 'Available' : 'In Use'}
-                    </span>
-                  </div>
-                  
-                  {!court.isAvailable && court.currentReservation && (
-                    <div className="mt-1 text-sm text-gray-500 flex-grow">
-                      <p className="mb-1">Started: {new Date(court.currentReservation?.startTime).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}</p>
-                      <p className="break-words">Players: {court.currentReservation?.userIds?.join(', ') || 'No players info'}</p>
+              courts
+                .sort((a, b) => {
+                  const numA = parseInt(a.name.replace('Court ', ''));
+                  const numB = parseInt(b.name.replace('Court ', ''));
+                  return numA - numB;
+                })
+                .map((court) => (
+                  <div 
+                    key={court._id} 
+                    className="border p-3 rounded-lg shadow-sm bg-white flex flex-col"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-base sm:text-lg font-medium">{court.name}</h3>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        court.isAvailable 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {court.isAvailable ? 'Available' : 'In Use'}
+                      </span>
                     </div>
-                  )}
-
-                  <div className="mt-2 space-y-2">
-                    <button
-                      onClick={() => handleReserveClick(court)}
-                      disabled={!court.isAvailable}
-                      className={`w-full py-2 px-3 rounded text-sm sm:text-base ${
-                        court.isAvailable
-                          ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                          : 'bg-gray-200 text-gray-500'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      {court.isAvailable ? 'Reserve Court' : 'In Use'}
-                    </button>
-
-                    {!court.isAvailable && court.currentReservation?.type === 'half' && (
-                      <button
-                        onClick={() => handleMergeClick(court)}
-                        className="w-full py-2 px-3 text-sm sm:text-base bg-yellow-500 hover:bg-yellow-600 text-white rounded"
-                      >
-                        Merge Into Full Court
-                      </button>
+                    
+                    {!court.isAvailable && court.currentReservation && (
+                      <div className="mt-1 text-sm text-gray-500 flex-grow">
+                        <p className="mb-1">Started: {new Date(court.currentReservation?.startTime).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}</p>
+                        <p className="break-words">Players: {court.currentReservation?.userIds?.join(', ') || 'No players info'}</p>
+                      </div>
                     )}
+
+                    <div className="mt-2 space-y-2">
+                      <button
+                        onClick={() => handleReserveClick(court)}
+                        disabled={!court.isAvailable}
+                        className={`w-full py-2 px-3 rounded text-sm sm:text-base ${
+                          court.isAvailable
+                            ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-500'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        {court.isAvailable ? 'Reserve Court' : 'In Use'}
+                      </button>
+
+                      {!court.isAvailable && court.currentReservation?.type === 'half' && (
+                        <button
+                          onClick={() => handleMergeClick(court)}
+                          className="w-full py-2 px-3 text-sm sm:text-base bg-yellow-500 hover:bg-yellow-600 text-white rounded"
+                        >
+                          Merge Into Full Court
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))
             )}
           </div>
         </div>

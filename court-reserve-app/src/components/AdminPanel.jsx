@@ -29,10 +29,16 @@ export default function AdminPanel() {
 
   const loadCourts = async () => {
     try {
-      const response = await fetchCourts();
-      if (response && response.success && response.courts) {
+      const response = await fetch(`${API_BASE_URL}/api/courts/all`, {
+        headers: {
+          'x-admin-password': 'canamadmin'
+        }
+      });
+      const data = await response.json();
+      
+      if (data.success && data.courts) {
         // Process courts to check for expired games
-        const processedCourts = response.courts.map(court => {
+        const processedCourts = data.courts.map(court => {
           if (court.currentReservation) {
             const startTime = new Date(court.currentReservation.startTime);
             const currentTime = new Date();
@@ -50,9 +56,12 @@ export default function AdminPanel() {
           return court;
         });
         setCourts(processedCourts);
+      } else {
+        setError('Failed to load courts');
       }
     } catch (error) {
       setError('Failed to load courts');
+      console.error('Error loading courts:', error);
     }
   };
 
@@ -266,54 +275,60 @@ export default function AdminPanel() {
           Courts Status
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {courts.map((court) => (
-            <div
-              key={court._id}
-              className="border rounded-lg p-4 bg-white shadow-sm"
-            >
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="text-lg font-medium">{court.name}</h3>
-                <div className="flex gap-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    court.isAvailable 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {court.isAvailable ? 'Available' : 'In Use'}
-                  </span>
+          {courts
+            .sort((a, b) => {
+              const numA = parseInt(a.name.replace('Court ', ''));
+              const numB = parseInt(b.name.replace('Court ', ''));
+              return numA - numB;
+            })
+            .map((court) => (
+              <div
+                key={court._id}
+                className="border rounded-lg p-4 bg-white shadow-sm"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="text-lg font-medium">{court.name}</h3>
+                  <div className="flex gap-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      court.isAvailable 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {court.isAvailable ? 'Available' : 'In Use'}
+                    </span>
+                    <button
+                      onClick={() => handleToggleVisibility(court._id)}
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        court.isVisible
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {court.isVisible ? 'Visible' : 'Hidden'}
+                    </button>
+                  </div>
+                </div>
+
+                {!court.isAvailable && court.currentReservation && (
+                  <div className="text-sm text-gray-500 mb-3">
+                    <p>Started: {new Date(court.currentReservation.startTime).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}</p>
+                    <p>Players: {court.currentReservation.userIds.join(', ')}</p>
+                  </div>
+                )}
+
+                {!court.isAvailable && (
                   <button
-                    onClick={() => handleToggleVisibility(court._id)}
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      court.isVisible
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
+                    onClick={() => handleResetCourt(court._id)}
+                    className="w-full mt-2 bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
                   >
-                    {court.isVisible ? 'Visible' : 'Hidden'}
+                    Reset Court
                   </button>
-                </div>
+                )}
               </div>
-
-              {!court.isAvailable && court.currentReservation && (
-                <div className="text-sm text-gray-500 mb-3">
-                  <p>Started: {new Date(court.currentReservation.startTime).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}</p>
-                  <p>Players: {court.currentReservation.userIds.join(', ')}</p>
-                </div>
-              )}
-
-              {!court.isAvailable && (
-                <button
-                  onClick={() => handleResetCourt(court._id)}
-                  className="w-full mt-2 bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
-                >
-                  Reset Court
-                </button>
-              )}
-            </div>
-          ))}
+            ))}
         </div>
       </div>
     </div>
