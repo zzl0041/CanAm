@@ -21,13 +21,20 @@ export default function RootLayout({ children }) {
               <Image
                 src="/CanAm.png"
                 alt="CanAm Logo"
-                width={40}
-                height={40}
+                width={70}
+                height={70}
                 className="rounded-full"
               />
               <h1 className="text-2xl font-bold">
                 CanAm Badminton Court Reservation System
               </h1>
+              <Image
+                src="/qrcodeph.com_1748884377974.png"
+                alt="Reservation System QR Code"
+                width={70}
+                height={70}
+                className="ml-4"
+              />
             </div>
           </div>
         </header>
