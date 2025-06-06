@@ -32,29 +32,43 @@ export const registerUser = async (phoneNumber) => {
   }
 };
 
-export const fetchCourts = async () => {
+export const fetchCourtsVisible = async () => {
   try {
-    console.log('Fetching courts from:', `${API_BASE_URL}/api/courts`);
-    const response = await fetch(`${API_BASE_URL}/api/courts`, {
+    // Fetch visible courts
+    const courtsRes = await fetch(`${API_BASE_URL}/api/courts`);
+    if (!courtsRes.ok) {
+      throw new Error(`HTTP error! status: ${courtsRes.status}`);
+    }
+    const courtsData = await courtsRes.json();
+    if (!courtsData.success || !Array.isArray(courtsData.courts)) {
+      throw new Error(courtsData.error || 'Failed to fetch courts');
+    }
+    // The /api/courts/all endpoint includes waitlist and availability info directly.
+    // We will use waitlistCount from the response for status.
+    return { success: true, courts: courtsData.courts };
+  } catch (error) {
+    console.error('Error fetching courts:', error);
+    throw error;
+  }
+};
+
+export const fetchCourtsAdmin = async () => {
+  try {
+    const courtsRes = await fetch(`${API_BASE_URL}/api/courts/all`, {
       headers: {
         'x-admin-password': 'canamadmin'
       }
     });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    if (!courtsRes.ok) {
+      throw new Error(`HTTP error! status: ${courtsRes.status}`);
     }
-    
-    const data = await response.json();
-    console.log('Courts API response:', data);
-    
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to fetch courts');
+    const courtsData = await courtsRes.json();
+    if (!courtsData.success || !Array.isArray(courtsData.courts)) {
+      throw new Error(courtsData.error || 'Failed to fetch courts');
     }
-    
-    return data;
+    return { success: true, courts: courtsData.courts };
   } catch (error) {
-    console.error('Error fetching courts:', error);
+    console.error('Error fetching admin courts:', error);
     throw error;
   }
 };
@@ -106,16 +120,13 @@ export const joinQueue = (userIds, type) => api.post('/queue/join', { userIds, t
 
 export const resetCourt = async (courtId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/admin/reset-court`, {
+    const response = await fetch(`${API_BASE_URL}/api/admin/reset-court/${courtId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-admin-password': 'canamadmin'
       },
-      body: JSON.stringify({
-        courtId,
-        adminPassword: 'canamadmin'
-      })
+      body: JSON.stringify({}),
     });
     const data = await response.json();
     if (!data.success) {

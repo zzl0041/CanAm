@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { fetchCourts, resetCourt } from '../utils/api';
+import { fetchCourtsAdmin, resetCourt } from '../utils/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://canam-server.onrender.com';
 
@@ -13,6 +13,12 @@ export default function AdminPanel() {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    console.log('Users state changed:', users);
+    console.log('Type of users.active:', typeof users.active, 'Is array:', Array.isArray(users.active));
+    console.log('Type of users.idle:', typeof users.idle, 'Is array:', Array.isArray(users.idle));
+  }, [users]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -29,12 +35,7 @@ export default function AdminPanel() {
 
   const loadCourts = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/courts/all`, {
-        headers: {
-          'x-admin-password': 'canamadmin'
-        }
-      });
-      const data = await response.json();
+      const data = await fetchCourtsAdmin();
       
       if (data.success && data.courts) {
         // Process courts to check for expired games
@@ -73,18 +74,55 @@ export default function AdminPanel() {
           'x-admin-password': 'canamadmin'
         }
       });
+      console.log('Load users raw response:', response);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
+      console.log('Load users parsed data:', data);
       
-      if (data.success) {
+      if (data && data.success && data.activeUsers && data.idleUsers) {
+        // Convert the objects of users into arrays and include the username (key)
+        const activeUsersArray = Object.entries(data.activeUsers).map(([username, userDetails]) => ({
+          username: username, // Add username from the key
+          animalName: userDetails.animalName,
+          phoneNumber: userDetails.phoneNumber,
+          createdAt: userDetails.createdAt,
+          expiresAt: userDetails.expiresAt,
+          // Add other relevant fields if available and needed for display
+          // courtNumber: userDetails.courtNumber, // Data not available in this endpoint response structure
+          // startTime: userDetails.startTime, // Data not available in this endpoint response structure
+        }));
+
+        const idleUsersArray = Object.entries(data.idleUsers).map(([username, userDetails]) => ({
+          username: username, // Add username from the key
+          animalName: userDetails.animalName,
+          phoneNumber: userDetails.phoneNumber,
+          createdAt: userDetails.createdAt,
+          // Add other relevant fields if available and needed
+        }));
+
+        // Filter for users registered today if needed, but for now use all users
+        // const today = new Date();
+        // today.setHours(0, 0, 0, 0);
+        // const registeredTodayIdle = idleUsersArray.filter(user => new Date(user.createdAt) >= today);
+        // const registeredTodayActive = activeUsersArray.filter(user => new Date(user.createdAt) >= today);
+
         setUsers({
-          active: data.activeUsers || [],
-          idle: data.idleUsers || []
+          active: activeUsersArray || [],
+          idle: idleUsersArray || []
         });
+        setError(null);
       } else {
-        setError('Failed to load users');
+        console.error('API returned success: false or unexpected data structure:', data);
+        setError(data.error || 'Failed to load users: Unexpected response format.');
+        setUsers({ active: [], idle: [] });
       }
     } catch (error) {
+      console.error('Error during loadUsers fetch or processing:', error);
       console.error('Failed to load users:', error);
+      setError(error.message || 'Failed to load users: Network or processing error.');
+      setUsers({ active: [], idle: [] });
     } finally {
       setLoading(false);
     }
@@ -125,13 +163,13 @@ export default function AdminPanel() {
 
   const handleToggleVisibility = async (courtId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/toggle-court-visibility`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/toggle-court-visibility/${courtId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-admin-password': 'canamadmin'
         },
-        body: JSON.stringify({ courtId }),
+        body: JSON.stringify({}),
       });
 
       const data = await response.json();
@@ -217,21 +255,19 @@ export default function AdminPanel() {
             Users In Game ({users.active.length})
           </h3>
           <div className="space-y-2">
-            {users.active.map((user, index) => (
+            {users.active.map((user) => (
               <div 
-                key={index}
+                key={user._id}
                 className="flex justify-between items-center p-2 bg-blue-50 rounded"
               >
                 <div>
                   <p className="font-medium text-blue-800">{user.username}</p>
-                  <p className="text-sm text-blue-600">Court {user.courtNumber}</p>
                 </div>
-                <span className="text-sm text-blue-600">
-                  {new Date(user.startTime).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </span>
+                <div className="text-right">
+                  <span className="text-sm text-blue-600">
+                    {user.createdAt && `Started: ${new Date(user.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                  </span>
+                </div>
               </div>
             ))}
             {users.active.length === 0 && (
@@ -246,9 +282,9 @@ export default function AdminPanel() {
             Registered Users ({users.idle.length})
           </h3>
           <div className="space-y-2">
-            {users.idle.map((user, index) => (
+            {users.idle.map((user) => (
               <div 
-                key={index}
+                key={user._id}
                 className="flex justify-between items-center p-2 bg-gray-50 rounded"
               >
                 <div>

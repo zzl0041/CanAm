@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { fetchCourts, reserveCourt } from '../utils/api';
+import { fetchCourtsVisible, reserveCourt } from '../utils/api';
 import QueueStatus from './QueueStatus';
 import { validateUsernames } from '../utils/validation';
 
@@ -13,6 +13,7 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
   const [usernames, setUsernames] = useState(['', '']);
   const [activeUsers, setActiveUsers] = useState(new Set());
   const [error, setError] = useState(null);
+  const [popup, setPopup] = useState(null);
 
   // Fetch active users when modal opens
   useEffect(() => {
@@ -47,36 +48,18 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
     setUsernames(prev => {
       const newUsernames = [...prev];
       newUsernames[index] = value;
-      // Clear error when user starts typing
       setError(null);
       return newUsernames;
     });
   };
 
-  const validateUsernames = async (usernames) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/validate-users`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-password': 'canamadmin'
-        },
-        body: JSON.stringify({ usernames: usernames.filter(u => u.trim() !== '') })
-      });
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Username validation error:', error);
-      throw error;
-    }
-  };
-
   const handleSubmit = async () => {
     try {
       // Filter out empty usernames
-      const validUsernames = usernames.filter(username => username.trim() !== '');
+      let validUsernames = usernames.filter(username => username.trim() !== '');
+      // Format: first letter uppercase, rest lowercase
+      validUsernames = validUsernames.map(u => u.charAt(0).toUpperCase() + u.slice(1).toLowerCase());
       const requiredPlayers = courtType === 'half' ? 2 : 4;
-      
       if (validUsernames.length !== requiredPlayers) {
         setError({
           type: 'missing_players',
@@ -84,39 +67,28 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
         });
         return;
       }
-
-      // Check for duplicate usernames
-      if (new Set(validUsernames).size !== validUsernames.length) {
-        setError({
-          type: 'duplicate_players',
-          message: 'Each player must be unique'
-        });
-        return;
-      }
-
-      // Validate usernames exist
-      const validation = await validateUsernames(validUsernames);
-      if (!validation.valid) {
-        setError({
-          type: 'invalid_users',
-          message: validation.message || 'Invalid usernames provided',
-          users: validation.invalidUsernames
-        });
-        return;
-      }
-
-      // If all validations pass, proceed with reservation
-      onReserve({
-        courtId: selectedCourt._id,
-        usernames: validUsernames,
-        type: courtType,
-        option: courtType === 'half' ? 'queue' : null  // Always use 'queue' for half court
+      // No frontend validation, just call backend
+      const res = await fetch(`${API_BASE_URL}/api/reserve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courtId: selectedCourt._id,
+          userIds: validUsernames,
+          type: courtType,
+          option: courtType === 'half' ? 'merge' : 'queue' // Use 'merge' for half, 'queue' for full
+        })
       });
+      const data = await res.json();
+      setPopup({
+        success: data.success,
+        message: data.success ? 'Court reserved successfully!' : (data.error || 'Reservation failed'),
+        raw: data
+      });
+      if (data.success) {
+        onClose();
+      }
     } catch (error) {
-      setError({
-        type: 'system',
-        message: error.message || 'An error occurred while validating usernames'
-      });
+      setPopup({ success: false, message: error.message || 'Reservation failed' });
     }
   };
 
@@ -193,40 +165,7 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
           {/* Error Messages */}
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg">
-              <p className="text-sm text-red-600 font-medium">Unable to Reserve Court</p>
-              {error.type === 'active_users' && (
-                <>
-                  <p className="text-sm text-red-500">
-                    The following users are currently in active games:
-                  </p>
-                  <ul className="mt-1 list-disc list-inside text-sm text-red-500">
-                    {error.users.map((user, index) => (
-                      <li key={index}>{user}</li>
-                    ))}
-                  </ul>
-                  <p className="mt-2 text-sm text-red-500">
-                    Please wait until their current game ends or enter different usernames.
-                  </p>
-                </>
-              )}
-              {error.type === 'invalid_users' && (
-                <>
-                  <p className="text-sm text-red-500">
-                    The following usernames are not registered:
-                  </p>
-                  <ul className="mt-1 list-disc list-inside text-sm text-red-500">
-                    {error.users.map((user, index) => (
-                      <li key={index}>{user}</li>
-                    ))}
-                  </ul>
-                  <p className="mt-2 text-sm text-red-500">
-                    Please make sure all players are registered users.
-                  </p>
-                </>
-              )}
-              {(error.type === 'missing_players' || error.type === 'system') && (
-                <p className="text-sm text-red-500">{error.message}</p>
-              )}
+              <p className="text-sm text-red-600 font-medium">{error.message}</p>
             </div>
           )}
 
@@ -249,6 +188,22 @@ const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
           </div>
         </div>
       </div>
+      {/* Popup for backend response */}
+      {popup && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="bg-white border border-gray-300 rounded-lg shadow-lg p-6 max-w-md w-full">
+            <h4 className={`text-lg font-semibold mb-2 ${popup.success ? 'text-green-600' : 'text-red-600'}`}>{popup.success ? 'Success' : 'Error'}</h4>
+            <div className="mb-2">{popup.message}</div>
+            <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto max-h-40">{JSON.stringify(popup.raw, null, 2)}</pre>
+            <button
+              onClick={() => setPopup(null)}
+              className="mt-4 w-full py-2 px-4 rounded bg-blue-500 text-white hover:bg-blue-600"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -272,10 +227,10 @@ const MergeModal = ({ court, onClose, onMerge }) => {
     try {
       setLoading(true);
       setError(null);
-      
       // Filter out empty usernames
-      const validUsernames = usernames.filter(username => username.trim() !== '');
-      
+      let validUsernames = usernames.filter(username => username.trim() !== '');
+      // Format: first letter uppercase, rest lowercase
+      validUsernames = validUsernames.map(u => u.charAt(0).toUpperCase() + u.slice(1).toLowerCase());
       if (validUsernames.length !== 2) {
         setError({
           type: 'missing_players',
@@ -283,7 +238,6 @@ const MergeModal = ({ court, onClose, onMerge }) => {
         });
         return;
       }
-
       // Check for duplicate usernames with existing players
       const existingPlayers = court.currentReservation?.userIds || [];
       const allPlayers = [...existingPlayers, ...validUsernames];
@@ -294,7 +248,6 @@ const MergeModal = ({ court, onClose, onMerge }) => {
         });
         return;
       }
-
       // Validate usernames exist
       const validation = await validateUsernames(validUsernames);
       if (!validation.valid) {
@@ -305,13 +258,11 @@ const MergeModal = ({ court, onClose, onMerge }) => {
         });
         return;
       }
-
       // If all validations pass, proceed with merge
       await onMerge({
         courtId: court._id,
         usernames: validUsernames
       });
-      
       onClose();
     } catch (error) {
       setError({
@@ -430,12 +381,13 @@ export default function CourtList() {
 
     try {
       setLoading(true);
-      const response = await fetchCourts();
-      console.log('Courts response:', response); // Add logging
+      const response = await fetchCourtsVisible();
+      console.log('Courts response:', response);
       
       if (response && response.success && response.courts) {
-        console.log('Setting courts:', response.courts); // Add logging
+        console.log('Setting courts:', response.courts);
         setCourts(response.courts);
+        setError(null);
       } else {
         console.error('Invalid response format:', response);
         setError('Invalid response format from server');
@@ -563,8 +515,8 @@ export default function CourtList() {
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="text-base sm:text-lg font-medium">{court.name}</h3>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        court.isAvailable 
-                          ? 'bg-green-100 text-green-800' 
+                        court.isAvailable
+                          ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
                       }`}>
                         {court.isAvailable ? 'Available' : 'In Use'}
@@ -611,7 +563,7 @@ export default function CourtList() {
 
         {/* Right side - QueueStatus */}
         <div className="w-full lg:w-1/3 sticky top-4">
-          <QueueStatus />
+          <QueueStatus courts={courts} />
         </div>
       </div>
 
