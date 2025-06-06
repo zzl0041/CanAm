@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from 'react';
-import { v4 as uuidv4 } from 'uuid'; // Using uuid for unique IDs (need to install if not already)
+
+// Simple client-side ID generation (for frontend-only use)
+const generateSimpleId = () => {
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
 
 export default function RacquetServiceTab() {
   const [requests, setRequests] = useState([]);
@@ -23,7 +27,7 @@ export default function RacquetServiceTab() {
       return;
     }
     const newRequest = {
-      id: uuidv4(),
+      id: generateSimpleId(), // Use simple ID generation
       name: formData.name,
       stringType: formData.stringType,
       tension: formData.tension,
