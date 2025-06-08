@@ -5,7 +5,7 @@ import { fetchCourtsVisible, reserveCourt } from '../utils/api';
 import QueueStatus from './QueueStatus';
 import { validateUsernames } from '../utils/validation';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://canam-server.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://queuesystem-be.onrender.com';
 
 // Separate ReservationModal component
 const ReservationModal = ({ selectedCourt, onClose, onReserve }) => {
@@ -353,9 +353,16 @@ export default function CourtList() {
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [selectedMergeCourt, setSelectedMergeCourt] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [joinModal, setJoinModal] = useState({ open: false, court: null });
+  const [dropModal, setDropModal] = useState({ open: false, court: null });
+  const [joinUsernames, setJoinUsernames] = useState(['', '']);
+  const [joinType, setJoinType] = useState('half');
+  const [modalResult, setModalResult] = useState(null);
+  const [dropUsernames, setDropUsernames] = useState(['', '']);
+  const [dropPhones, setDropPhones] = useState(['', '']);
 
   // Add ref to track if any modal is open
-  const isModalOpen = showReservationModal || showMergeModal;
+  const isModalOpen = showReservationModal || showMergeModal || joinModal.open || dropModal.open;
 
   useEffect(() => {
     loadCourts();
@@ -474,6 +481,75 @@ export default function CourtList() {
     }
   };
 
+  const handleJoinWaitlist = async () => {
+    if (!joinModal.court) return;
+
+    try {
+      const formattedUsernames = joinUsernames.filter(u => u.trim()).map(u => u.charAt(0).toUpperCase() + u.slice(1).toLowerCase());
+      const requiredPlayers = joinType === 'half' ? 2 : 4;
+      if (formattedUsernames.length !== requiredPlayers) {
+        setModalResult({ success: false, message: `Please enter ${requiredPlayers} valid usernames.` });
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/reserve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courtId: joinModal.court._id,
+          userIds: formattedUsernames,
+          type: joinType,
+          option: joinType === 'half' ? 'merge' : 'queue'
+        })
+      });
+      const data = await response.json();
+      setModalResult({ success: data.success, message: data.success ? 'Joined waitlist!' : (data.error || 'Failed to join waitlist.'), raw: data });
+      if (data.success) {
+        setJoinModal({ open: false, court: null });
+        loadCourts(true);
+      }
+    } catch (error) {
+      setModalResult({ success: false, message: error.message || 'Failed to join waitlist.' });
+    }
+  };
+
+  const handleDropWaitlist = async () => {
+    if (!dropModal.court) return;
+
+    try {
+      const formattedDrops = dropUsernames.map((username, index) => ({
+        animalName: username.trim() ? username.charAt(0).toUpperCase() + username.slice(1).toLowerCase() : '',
+        phoneNumber: dropPhones[index].replace(/\D/g, '')
+      })).filter(drop => drop.animalName || drop.phoneNumber);
+
+      if (formattedDrops.length !== 2 || formattedDrops.some(drop => !drop.animalName || drop.phoneNumber.length !== 10)) {
+        setModalResult({ success: false, message: 'Please enter two sets of valid username and 10-digit phone number.' });
+        return;
+      }
+
+      const dropData = {
+        animalName1: formattedDrops[0].animalName,
+        phoneNumber1: formattedDrops[0].phoneNumber,
+        animalName2: formattedDrops[1].animalName,
+        phoneNumber2: formattedDrops[1].phoneNumber,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/waitlist/${dropModal.court._id}/drop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dropData)
+      });
+      const data = await response.json();
+      setModalResult({ success: data.success, message: data.success ? 'Dropped from waitlist!' : (data.error || 'Failed to drop from waitlist.'), raw: data });
+      if (data.success) {
+        loadCourts(true);
+        setDropModal({ open: false, court: null });
+      }
+    } catch (error) {
+      setModalResult({ success: false, message: error.message || 'Failed to drop from waitlist.' });
+    }
+  };
+
   if (loading) {
     return <div className="text-center p-4">Loading courts...</div>;
   }
@@ -492,7 +568,12 @@ export default function CourtList() {
   return (
     <div className="space-y-4 max-w-7xl mx-auto">
       <div className="flex flex-col lg:flex-row gap-4">
-        {/* Left side - Courts Grid */}
+        {/* Left side - Queue Status */}
+        <div className="w-full lg:w-1/3">
+          <QueueStatus courts={courts} />
+        </div>
+
+        {/* Right side - Courts Grid */}
         <div className="w-full lg:w-2/3">
           {/* Grid container with responsive columns */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -533,53 +614,218 @@ export default function CourtList() {
                       </div>
                     )}
 
-                    <div className="mt-2 space-y-2">
-                      <button
-                        onClick={() => handleReserveClick(court)}
-                        disabled={!court.isAvailable}
-                        className={`w-full py-2 px-3 rounded text-sm sm:text-base ${
-                          court.isAvailable
-                            ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                            : 'bg-gray-200 text-gray-500'
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        {court.isAvailable ? 'Reserve Court' : 'In Use'}
-                      </button>
+                    {/* Display waitlist entries if a waitlist exists */}
+                    {court.waitlist && court.waitlist.length > 0 && (
+                      <div className="mt-2 text-sm text-gray-700">
+                        <p className="font-medium">Waitlist:</p>
+                        <ul className="list-disc list-inside">
+                          {court.waitlist.map((entry, idx) => (
+                            <li key={idx} className="mb-1 flex justify-between items-center">
+                              <div>
+                                <span className="font-semibold text-gray-800">#{entry.waitlistIndex}:</span>
+                                <span className="ml-1 text-gray-700 break-words">{entry.userIds?.join(', ') || ''}</span>
+                              </div>
+                              {entry.startTime && (
+                                <span className="text-gray-500 text-xs ml-2 shrink-0">
+                                  startTime: {new Date(entry.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                              {entry.isReady && <span className="ml-2 text-green-600 font-semibold">(Ready)</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
-                      {!court.isAvailable && court.currentReservation?.type === 'half' && (
+                    <div className="flex flex-col space-y-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
-                          onClick={() => handleMergeClick(court)}
-                          className="w-full py-2 px-3 text-sm sm:text-base bg-yellow-500 hover:bg-yellow-600 text-white rounded"
+                          onClick={() => handleReserveClick(court)}
+                          disabled={!court.isAvailable}
+                          className={`flex-1 min-w-[120px] px-3 py-2 text-sm rounded-md ${
+                            court.isAvailable
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                         >
-                          Merge Into Full Court
+                          Reserve
                         </button>
-                      )}
+                        {!court.isAvailable && (
+                          <button
+                            onClick={() => {
+                              setJoinType('half');
+                              setJoinUsernames(['', '']);
+                              setJoinModal({ open: true, court });
+                              setModalResult(null);
+                            }}
+                            className="flex-1 min-w-[120px] px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
+                          >
+                            Join Waitlist
+                          </button>
+                        )}
+                        {court.waitlistCount > 0 && (
+                          <button
+                            onClick={() => {
+                              setDropUsernames(['', '']);
+                              setDropPhones(['', '']);
+                              setDropModal({ open: true, court });
+                              setModalResult(null);
+                            }}
+                            className="flex-1 min-w-[120px] px-3 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
+                          >
+                            Drop
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))
             )}
           </div>
         </div>
-
-        {/* Right side - QueueStatus */}
-        <div className="w-full lg:w-1/3 sticky top-4">
-          <QueueStatus courts={courts} />
-        </div>
       </div>
 
-      {/* Modals */}
-      {showReservationModal && (
+      {/* Join Waitlist Modal */}
+      {joinModal.open && joinModal.court && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full relative">
+            <button
+              className="absolute top-3 right-5 text-gray-400 hover:text-gray-700 text-5xl font-bold focus:outline-none"
+              onClick={() => setJoinModal({ open: false, court: null })}
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            <h3 className="text-lg font-semibold mb-4">Join Waitlist for {joinModal.court?.name}</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Court Reservation Type</label>
+              <div className="flex gap-2 mb-2">
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-2 rounded text-sm ${joinType === 'half' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}
+                  onClick={() => {
+                    setJoinType('half');
+                    setJoinUsernames(['', '']);
+                  }}
+                >
+                  Half Court (2)
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-2 rounded text-sm ${joinType === 'full' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}
+                  onClick={() => {
+                    setJoinType('full');
+                    setJoinUsernames(['', '', '', '']);
+                  }}
+                >
+                  Full Court (4)
+                </button>
+              </div>
+              {joinUsernames.map((username, idx) => (
+                <input
+                  key={idx}
+                  type="text"
+                  value={username}
+                  onChange={e => setJoinUsernames(prev => prev.map((u, i) => i === idx ? e.target.value : u))}
+                  placeholder={`Player ${idx + 1} username`}
+                  className="w-full p-2 border rounded mb-2"
+                />
+              ))}
+            </div>
+            {modalResult && (
+              <div className={`mb-2 text-sm ${modalResult.success ? 'text-green-600' : 'text-red-600'}`}>{modalResult.message}</div>
+            )}
+            <div className="flex gap-2 mt-4">
+              <button
+                className="flex-1 bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400"
+                onClick={() => setJoinModal({ open: false, court: null })}
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600"
+                onClick={handleJoinWaitlist}
+              >
+                Join
+              </button>
+            </div>
+            {modalResult && modalResult.raw && (
+              <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto mt-2 max-h-32">{JSON.stringify(modalResult.raw, null, 2)}</pre>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Drop from Waitlist Modal */}
+      {dropModal.open && dropModal.court && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Drop from Waitlist for {dropModal.court?.name}</h3>
+            <div className="space-y-4 mb-4">
+              {[0, 1].map(index => (
+                <div key={index} className="border p-3 rounded">
+                  <label className="block text-sm font-medium mb-1 text-gray-700">User {index + 1}</label>
+                  <input
+                    type="text"
+                    value={dropUsernames[index]}
+                    onChange={e => setDropUsernames(prev => prev.map((name, i) => i === index ? e.target.value : name))}
+                    placeholder="Username"
+                    className="w-full p-2 border rounded mb-2 text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={dropPhones[index]}
+                    onChange={e => { if (/^\d{0,10}$/.test(e.target.value)) setDropPhones(prev => prev.map((phone, i) => i === index ? e.target.value : phone)); }}
+                    placeholder="Phone Number (10 digits)"
+                    maxLength={10}
+                    className="w-full p-2 border rounded text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+            {modalResult && (
+              <div className={`mb-2 text-sm ${modalResult.success ? 'text-green-600' : 'text-red-600'}`}>{modalResult.message}</div>
+            )}
+            <div className="flex gap-2 mt-4">
+              <button
+                className="flex-1 bg-gray-300 text-gray-800 py-2 px-4 rounded hover:bg-gray-400"
+                onClick={() => { setDropModal({ open: false, court: null }); setDropPhones(['', '']); }}
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
+                onClick={handleDropWaitlist}
+              >
+                Drop
+              </button>
+            </div>
+            {modalResult && modalResult.raw && (
+              <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto mt-2 max-h-32">{JSON.stringify(modalResult.raw, null, 2)}</pre>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Existing modals */}
+      {showReservationModal && selectedCourt && (
         <ReservationModal
           selectedCourt={selectedCourt}
-          onClose={() => setShowReservationModal(false)}
+          onClose={() => {
+            setShowReservationModal(false);
+            setSelectedCourt(null);
+          }}
           onReserve={handleReservation}
         />
       )}
 
-      {showMergeModal && (
+      {showMergeModal && selectedMergeCourt && (
         <MergeModal
           court={selectedMergeCourt}
-          onClose={() => setShowMergeModal(false)}
+          onClose={() => {
+            setShowMergeModal(false);
+            setSelectedMergeCourt(null);
+          }}
           onMerge={handleMerge}
         />
       )}

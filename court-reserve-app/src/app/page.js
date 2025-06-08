@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import AuthForm from '@/components/AuthForm';
 import CourtList from '@/components/CourtList';
 import AdminPanel from '@/components/AdminPanel';
-import RacquetServiceTab from '@/components/RacquetServiceTab';
 import { fetchCourtsAdmin } from '../utils/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://canam-server.onrender.com';
@@ -416,90 +415,64 @@ function WaitlistTab() {
 }
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('courts');
+  const [activeTab, setActiveTab] = useState('court-status');
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Tabs */}
-      <div className="flex mb-4 border-b">
-        <button
-          className={`py-2 px-4 mr-2 ${
-            activeTab === 'courts'
-              ? 'border-b-2 border-blue-500 text-blue-500'
-              : 'text-gray-500'
-          }`}
-          onClick={() => setActiveTab('courts')}
-        >
-          Court Status
-        </button>
-        <button
-          className={`py-2 px-4 mr-2 ${
-            activeTab === 'register'
-              ? 'border-b-2 border-blue-500 text-blue-500'
-              : 'text-gray-500'
-          }`}
-          onClick={() => setActiveTab('register')}
-        >
-          Register
-        </button>
-        <button
-          className={`py-2 px-4 mr-2 ${
-            activeTab === 'waitlist'
-              ? 'border-b-2 border-blue-500 text-blue-500'
-              : 'text-gray-500'
-          }`}
-          onClick={() => setActiveTab('waitlist')}
-        >
-          Court Waitlist
-        </button>
-        <button
-          className={`py-2 px-4 mr-2 ${
-            activeTab === 'racquetService'
-              ? 'border-b-2 border-blue-500 text-blue-500'
-              : 'text-gray-500'
-          }`}
-          onClick={() => setActiveTab('racquetService')}
-        >
-          Racquet Service
-        </button>
-        <button
-          className={`py-2 px-4 ${
-            activeTab === 'admin'
-              ? 'border-b-2 border-blue-500 text-blue-500'
-              : 'text-gray-500'
-          }`}
-          onClick={() => setActiveTab('admin')}
-        >
-          Admin
-        </button>
-      </div>
+    <div className="min-h-screen bg-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Court Reserve</h1>
+          <div className="flex space-x-4">
+            <button
+              onClick={() => setActiveTab('court-status')}
+              className={`px-4 py-2 rounded-md ${
+                activeTab === 'court-status'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Court Status
+            </button>
+            <button
+              onClick={() => setActiveTab('register')}
+              className={`px-4 py-2 rounded-md ${
+                activeTab === 'register'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Register
+            </button>
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`px-4 py-2 rounded-md ${
+                activeTab === 'admin'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Admin
+            </button>
+          </div>
+        </div>
 
-      {/* Tab Content */}
-      <div className="mt-4">
-        {activeTab === 'courts' && (
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Court Status & Reservations</h2>
-            <CourtList />
-          </div>
-        )}
-        {activeTab === 'register' && (
-          <div>
-            <h2 className="text-xl font-semibold mb-4">User Registration</h2>
-            <AuthForm />
-          </div>
-        )}
-        {activeTab === 'waitlist' && (
-          <WaitlistTab />
-        )}
-        {activeTab === 'racquetService' && (
-          <RacquetServiceTab />
-        )}
-        {activeTab === 'admin' && (
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Admin Panel</h2>
-            <AdminPanel />
-          </div>
-        )}
+        <div className="bg-white rounded-lg shadow">
+          {activeTab === 'court-status' && (
+            <div className="p-6">
+              <CourtList />
+            </div>
+          )}
+          {activeTab === 'register' && (
+            <div className="p-6">
+              <AuthForm />
+            </div>
+          )}
+          {activeTab === 'admin' && (
+            <div className="p-6">
+              <AdminPanel />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
