@@ -89,9 +89,7 @@ export default function AdminPanel() {
           phoneNumber: userDetails.phoneNumber,
           createdAt: userDetails.createdAt,
           expiresAt: userDetails.expiresAt,
-          // Add other relevant fields if available and needed for display
-          // courtNumber: userDetails.courtNumber, // Data not available in this endpoint response structure
-          // startTime: userDetails.startTime, // Data not available in this endpoint response structure
+          isApproved: userDetails.isApproved
         }));
 
         const idleUsersArray = Object.entries(data.idleUsers).map(([username, userDetails]) => ({
@@ -99,14 +97,8 @@ export default function AdminPanel() {
           animalName: userDetails.animalName,
           phoneNumber: userDetails.phoneNumber,
           createdAt: userDetails.createdAt,
-          // Add other relevant fields if available and needed
+          isApproved: userDetails.isApproved
         }));
-
-        // Filter for users registered today if needed, but for now use all users
-        // const today = new Date();
-        // today.setHours(0, 0, 0, 0);
-        // const registeredTodayIdle = idleUsersArray.filter(user => new Date(user.createdAt) >= today);
-        // const registeredTodayActive = activeUsersArray.filter(user => new Date(user.createdAt) >= today);
 
         setUsers({
           active: activeUsersArray || [],
@@ -182,6 +174,37 @@ export default function AdminPanel() {
       }
     } catch (error) {
       setError('Error toggling court visibility: ' + error.message);
+    }
+
+    // Clear messages after 3 seconds
+    setTimeout(() => {
+      setSuccessMessage(null);
+      setError(null);
+    }, 3000);
+  };
+
+  const handleToggleApproval = async (username, isApproved) => {
+    try {
+      const endpoint = isApproved ? 'unapprove' : 'approve';
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': 'canamadmin'
+        },
+        body: JSON.stringify({ animalName: username })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setSuccessMessage(`User ${isApproved ? 'unapproved' : 'approved'} successfully`);
+        loadUsers(); // Reload users to get updated status
+      } else {
+        setError(data.error || `Failed to ${isApproved ? 'unapprove' : 'approve'} user`);
+      }
+    } catch (error) {
+      setError(`Error ${isApproved ? 'unapproving' : 'approving'} user: ${error.message}`);
     }
 
     // Clear messages after 3 seconds
@@ -291,10 +314,21 @@ export default function AdminPanel() {
                   <p className="font-medium text-gray-800">{user.animalName}</p>
                   <p className="text-sm text-gray-600">{user.phoneNumber}</p>
                 </div>
-                <div className="text-right">
+                <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600">
                     Registered: {formatTime(user.createdAt)}
                   </span>
+                  {console.log('User approval status:', user.animalName, user.isApproved)}
+                  <button
+                    onClick={() => handleToggleApproval(user.animalName, user.isApproved)}
+                    className={`px-2 py-1 text-xs rounded-md ${
+                      user.isApproved
+                        ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                        : 'bg-green-100 text-green-800 hover:bg-green-200'
+                    }`}
+                  >
+                    {user.isApproved ? 'Unapprove' : 'Approve'}
+                  </button>
                 </div>
               </div>
             ))}
