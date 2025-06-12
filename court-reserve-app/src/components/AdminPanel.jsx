@@ -309,7 +309,11 @@ export default function AdminPanel() {
             {users.idle.map((user) => (
               <div 
                 key={user._id}
-                className="flex justify-between items-center p-2 bg-gray-50 rounded"
+                className={`flex justify-between items-center p-2 rounded ${
+                      user.isApproved
+                        ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                        : 'bg-red-100 text-red-800 hover:bg-red-200'
+                    }`}
               >
                 <div>
                   <p className="font-medium text-gray-800">{user.animalName}</p>
