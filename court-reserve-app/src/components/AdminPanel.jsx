@@ -185,7 +185,7 @@ export default function AdminPanel() {
 
   const handleToggleApproval = async (username, isApproved) => {
     try {
-      const endpoint = isApproved ? 'unapprove' : 'approve';
+      const endpoint = 'approve';
       const response = await fetch(`${API_BASE_URL}/api/admin/users/${endpoint}`, {
         method: 'POST',
         headers: {
@@ -196,6 +196,7 @@ export default function AdminPanel() {
       });
 
       const data = await response.json();
+      console.log('Data:', data);
       
       if (data.success) {
         setSuccessMessage(`User ${isApproved ? 'unapproved' : 'approved'} successfully`);
@@ -318,9 +319,8 @@ export default function AdminPanel() {
                   <span className="text-sm text-gray-600">
                     Registered: {formatTime(user.createdAt)}
                   </span>
-                  {console.log('User approval status:', user.animalName, user.isApproved)}
                   <button
-                    onClick={() => handleToggleApproval(user.animalName, user.isApproved)}
+                    onClick={() => handleToggleApproval(user.username, user.isApproved)}
                     className={`px-2 py-1 text-xs rounded-md ${
                       user.isApproved
                         ? 'bg-red-100 text-red-800 hover:bg-red-200'
