@@ -286,6 +286,7 @@ export default function AdminPanel() {
               >
                 <div>
                   <p className="font-medium text-blue-800">{user.username}</p>
+                  <p className="text-sm text-blue-600">{user.phoneNumber}</p>
                 </div>
                 <div className="text-right">
                   <span className="text-sm text-blue-600">
