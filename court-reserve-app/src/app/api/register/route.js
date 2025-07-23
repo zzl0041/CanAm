@@ -28,7 +28,8 @@ export async function POST(request) {
     }
 
     await dbConnect();
-    const cleanedPhone = validation.cleaned;
+    // Use only the last five digits for registration
+    const cleanedPhone = validation.cleaned.slice(-5);
 
     // Get current date in PST
     const now = new Date();

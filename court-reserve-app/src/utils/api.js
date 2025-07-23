@@ -12,9 +12,10 @@ const api = axios.create({
 
 export const registerUser = async (phoneNumber) => {
   try {
-    console.log('Sending registration request for:', phoneNumber);
+    const lastFive = phoneNumber.toString().trim().slice(-5);
+    console.log('Sending registration request for:', lastFive);
     const response = await api.post('/register', { 
-      phoneNumber: phoneNumber.toString().trim() 
+      phoneNumber: lastFive 
     });
     console.log('Registration response:', response.data);
     

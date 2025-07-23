@@ -32,8 +32,10 @@ export default function AuthForm() {
       return;
     }
 
+    // Only use the last five digits for registration
+    const lastFive = validation.cleaned.slice(-5);
     try {
-      const response = await registerUser(validation.cleaned);
+      const response = await registerUser(lastFive);
       
       if (!response.data || !response.data.success) {
         throw new Error(response.data?.error || 'Registration failed');
@@ -42,7 +44,7 @@ export default function AuthForm() {
       setModalContent({
         title: response.data.isExisting ? 'Welcome Back!' : 'Registration Successful!',
         username: response.data.user.animalName,
-        phone: validation.formatted,
+        phone: lastFive,
         isError: false
       });
       setShowModal(true);
@@ -104,15 +106,16 @@ export default function AuthForm() {
     <form onSubmit={handleRegister} className="max-w-sm mx-auto">
       <div className="mb-4">
         <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-          Phone Number
+          Last 5 digits of Phone Number
         </label>
         <input
           id="phone"
           type="tel"
           value={phone}
           onChange={handlePhoneChange}
-          placeholder="Enter your phone number"
+          placeholder="Enter last 5 digits of your phone number"
           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          maxLength={5}
         />
       </div>
 

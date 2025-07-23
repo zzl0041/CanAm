@@ -7,21 +7,14 @@ export const validatePhoneNumber = (phone) => {
   if (cleanPhone.length === 0) {
     return {
       isValid: false,
-      error: 'Please enter a phone number'
+      error: 'Please enter the last 5 digits of your phone number'
     };
   }
 
-  if (cleanPhone.length !== 10) {
+  if (cleanPhone.length !== 5) {
     return {
       isValid: false,
-      error: 'Phone number must be exactly 10 digits'
-    };
-  }
-
-  if (/^[01]/.test(cleanPhone)) {
-    return {
-      isValid: false,
-      error: 'Phone number cannot start with 0 or 1'
+      error: 'Please enter exactly 5 digits (the last 5 digits of your phone number)'
     };
   }
 
