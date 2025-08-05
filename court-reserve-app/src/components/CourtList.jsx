@@ -522,8 +522,8 @@ export default function CourtList() {
         phoneNumber: dropPhones[index].replace(/\D/g, '')
       })).filter(drop => drop.animalName || drop.phoneNumber);
 
-      if (formattedDrops.length !== 2 || formattedDrops.some(drop => !drop.animalName || drop.phoneNumber.length !== 10)) {
-        setModalResult({ success: false, message: 'Please enter two sets of valid username and 10-digit phone number.' });
+      if (formattedDrops.length !== 2 || formattedDrops.some(drop => !drop.animalName || drop.phoneNumber.length !== 5)) {
+        setModalResult({ success: false, message: 'Please enter two sets of valid username and 5-digit phone number.' });
         return;
       }
 
@@ -775,9 +775,9 @@ export default function CourtList() {
                   <input
                     type="text"
                     value={dropPhones[index]}
-                    onChange={e => { if (/^\d{0,10}$/.test(e.target.value)) setDropPhones(prev => prev.map((phone, i) => i === index ? e.target.value : phone)); }}
-                    placeholder="Phone Number (10 digits)"
-                    maxLength={10}
+                    onChange={e => { if (/^\d{0,5}$/.test(e.target.value)) setDropPhones(prev => prev.map((phone, i) => i === index ? e.target.value : phone)); }}
+                    placeholder="Last 5 digits of phone number"
+                    maxLength={5}
                     className="w-full p-2 border rounded text-sm"
                   />
                 </div>
